@@ -1,36 +1,96 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Title Studio（AI記事タイトル候補ジェネレーター）
 
-## Getting Started
+キーワード調査から記事企画、タイトル候補の作成・リライトまでを支援するWebアプリです。
+1回の生成で、日本語のタイトル候補を10案（各30〜35文字）作ります。
 
-First, run the development server:
+- **新規作成**（4工程）：キーワード → 記事企画 → 上位分析 → タイトル
+- **タイトルリライト**（5工程）：記事読込 → キーワード・順位 → 条件確認 → 上位比較 → 改善案
+
+## 資料
+
+| 資料 | 内容 |
+| --- | --- |
+| [docs/【要件定義】AI記事作成ジェネレーターVer4.html](docs/) | 要件定義（設計で決まった仕様だけを記載） |
+| [docs/【画面要件定義】screen-design.md](docs/) | 画面設計。要件定義と差がある場合はこちらを優先 |
+| [LEARNING.md](LEARNING.md) | 開発を通じた学びの記録 |
+
+## 技術構成
+
+- Next.js 16（App Router）＋ TypeScript ＋ Tailwind CSS 4
+- Claude API（モデル：Claude Sonnet 5.5）※段階6で接続
+- 履歴の保存：ブラウザの LocalStorage（生成に成功した結果だけ、最新20件）
+- 公開先：Vercel（合言葉でアクセス制限）
+
+## 動かし方
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install      # 初回だけ。必要な部品を入れる
+npm run dev      # 開発用サーバーを起動 → http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| コマンド | 用途 |
+| --- | --- |
+| `npm run dev` | 開発用サーバー（保存すると画面に自動反映） |
+| `npm run build` | 本番用にビルド（公開前の最終確認） |
+| `npm run lint` | 書き方のチェック（ESLint） |
+| `npx tsc --noEmit` | 型のチェック（TypeScript） |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+APIキーや合言葉は `.env.local` に書きます（Gitには入りません）。必要になるのは段階6以降です。
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## フォルダ構成
 
-## Learn More
+```
+docs/                    要件定義・画面設計（資料）
+src/
+  app/                   ページの入口（layout.tsx / page.tsx）
+  components/
+    layout/              ヘッダー・モード切り替え・工程タブ・戻る/次へ・履歴画面
+    new/                 新規作成①〜④の各工程
+    ui/                  入力欄・ボタン・トーストなどの共通部品
+  lib/                   工程の定義・文字数の上限・チェック処理
+  state/                 作業中の状態（ページを開いている間だけ保持）
+  mocks/                 開発用のサンプルデータ（AIの代わり）
+```
 
-To learn more about Next.js, take a look at the following resources:
+## 開発の進め方と進捗
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+最初はサンプルデータで画面と操作を作り、そのあとに外部とのつながりを追加します。
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| 段階 | 内容 | 状態 |
+| --- | --- | --- |
+| 0 | 初期設定（Next.js・Git） | 完了 |
+| 1 | 画面の骨組み（ヘッダー・モード切り替え・工程タブ・配色・スマホ表示） | 完了 |
+| 2 | 新規①〜④をサンプルデータで作成 | 作業中 |
+| 3 | リライト①〜⑤をサンプルデータで作成 | 未着手 |
+| 4 | 共通の動き（条件変更後の再確認・補足質問・離脱時の確認） | 未着手 |
+| 5 | URL読み込み | 未着手 |
+| 6 | Claude API 接続 | 未着手 |
+| 7 | 履歴保存（LocalStorage） | 未着手 |
+| 8 | 合言葉と利用制限 | 未着手 |
+| 9 | 検収 | 未着手 |
 
-## Deploy on Vercel
+## 開発の記録
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 2026-11-15　資料の確認と方針決定
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- 要件定義と画面設計を読み合わせ、矛盾点・不明点を整理した。
+- 決まったこと
+  - アクセス制限は**合言葉**で初版から実装する（有効14日、連続10回の誤入力で20分ロック）。
+  - リライトの「読み込む」（取得のみ・回数なし）と「記事を分析する」（AI利用1回）を別ボタンにする。
+  - 公開先は **Vercel**。利用回数と合言葉の失敗回数は、サーバー側の外部保存先で管理する。
+  - 資料のファイル名は今のままにする。
+- 資料を更新した：合言葉などの決定を画面設計（v1.6）と要件定義に反映し、要件定義は「設計で決まった仕様だけ」を残す形に整理した（古い版の表記・変更履歴・重複を削除）。
+
+### 2026-11-15　段階0：初期設定
+
+- `title-studio` 専用の Git リポジトリを作成した（親フォルダの別リポジトリと混ざらないようにするため）。
+- `create-next-app` を今のフォルダに実行して作成。`docs/` は上書きされないことを確認した。
+- `.gitignore` に `.env*` が入っており、秘密情報は Git に入らない。
+
+### 2026-11-15　段階1：画面の骨組み
+
+- ヘッダー（履歴件数）、モード切り替え、工程タブ、戻る／次へ、履歴画面の枠を作成。
+- 新規は青〜インディゴ、リライトは緑〜ティールで区別。色だけでなく文字でも表示。
+- モードを切り替えても、それぞれ最後に開いていた工程を覚えている。再読み込みすると新規①に戻る。
+- スマホ幅では工程タブを「② 記事企画／全4工程」＋工程一覧ボタンに切り替える。
+- AI処理中は、モード切り替え・工程移動・履歴を開く操作ができない仕組みを先に用意した。
