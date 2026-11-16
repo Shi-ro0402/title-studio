@@ -5,11 +5,15 @@
 import { useState } from "react";
 import { StepFooter } from "@/components/layout/StepFooter";
 import { StepHeading } from "@/components/layout/StepPlaceholder";
+import { IssueList, StepLinks, ViewTabs } from "@/components/shared/ResultParts";
+import { ClarifyPanel, toSupplements } from "@/components/shared/ClarifyPanel";
 import { RefList } from "@/components/shared/TopRefsEditor";
 import { AiButton, AiError, useAiRunner } from "@/components/ui/AiButton";
 import { SampleNotice } from "@/components/ui/SampleNotice";
+import { StaleNotice } from "@/components/ui/StaleNotice";
 import { copyText, useToast } from "@/components/ui/Toast";
 import { USING_SAMPLE_API, api } from "@/lib/api";
+import { rewriteFingerprint, rewriteRecheck } from "@/lib/staleness";
 import { countChars, isBlank } from "@/lib/text";
 import { checkTitles } from "@/lib/titleCheck";
 import {
@@ -26,6 +30,7 @@ export function ImproveStep() {
   const ai = useAiRunner();
   const toast = useToast();
   const [view, setView] = useState<"titles" | "refs">("titles");
+  const recheck = rewriteRecheck(draft, keywords);
 
   const missing: { label: string; step: number }[] = [];
   if (hasErrors(validateLoadStep(draft))) missing.push({ label: "①記事読込：現在のタイトル・本文（5,000文字以内）", step: 0 });
@@ -33,11 +38,18 @@ export function ImproveStep() {
   if (hasErrors(validateConditionStep(draft))) missing.push({ label: "③条件確認：テーマ・ペルソナ・読者の疑問・内容要約", step: 2 });
   if (hasErrors(validateCompareStep(draft))) missing.push({ label: "④上位比較：登録した上位タイトルの入力内容", step: 3 });
 
+  const staleSteps: { label: string; step: number }[] = [];
+  if (recheck.url || recheck.analysis) staleSteps.push({ label: "①記事読込（URLまたは本文の変更後、未確認）", step: 0 });
+  if (recheck.rank) staleSteps.push({ label: "②キーワード・順位（順位が未更新）", step: 1 });
+  if (recheck.condition) staleSteps.push({ label: "③条件確認（キーワードまたは本文の変更後、未確認）", step: 2 });
+  if (recheck.refs || recheck.comparison) staleSteps.push({ label: "④上位比較（上位情報は変更前の条件）", step: 3 });
+
   const referenceTitles = draft.topRefs.map((r) => r.title);
 
-  const generate = async () => {
+  const generate = async (withSupplements: boolean) => {
     if (missing.length > 0) return;
-    const result = await ai.run("改善タイトルを生成中", () =>
+    const supplements = withSupplements ? toSupplements(draft.clarify) : [];
+    const outcome = await ai.run(withSupplements ? "補足を反映して再確認中" : "改善タイトルを生成中", () =>
       api.generateRewriteTitles({
         keywords,
         currentTitle: draft.currentTitle,
@@ -45,15 +57,21 @@ export function ImproveStep() {
         plan: draft.plan,
         tone: draft.tone,
         referenceTitles,
+        supplements,
       }),
     );
-    if (result) {
-      update((d) => ({
-        ...d,
-        titles: { items: result, generatedAt: new Date().toISOString(), isSample: USING_SAMPLE_API },
-      }));
-      setView("titles");
+    if (!outcome) return;
+    if (outcome.kind === "clarify") {
+      update((d) => ({ ...d, clarify: { issues: outcome.issues, answers: {} } }));
+      return;
     }
+    update((d) => ({
+      ...d,
+      titles: { items: outcome.items, generatedAt: new Date().toISOString(), isSample: USING_SAMPLE_API },
+      basis: { ...d.basis, titles: rewriteFingerprint.titles(d, keywords) },
+      clarify: null,
+    }));
+    setView("titles");
   };
 
   const copy = async (text: string) => {
@@ -78,55 +96,49 @@ export function ImproveStep() {
 
         <div className="flex flex-col gap-3 rounded-md border border-slate-200 p-4">
           {missing.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              <p className="text-sm font-bold text-slate-800">生成の前に、次の項目を確認してください。</p>
-              <ul className="flex flex-col gap-1 text-sm">
-                {missing.map((m) => (
-                  <li key={m.step} className="flex flex-wrap items-center gap-2">
-                    <span className="text-red-700">・{m.label}</span>
-                    <button type="button" className="underline" disabled={locked} onClick={() => goToStep(m.step)}>この工程へ移動</button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <StepLinks title="生成の前に、次の項目を確認してください。" items={missing} locked={locked} onGo={goToStep} tone="error" />
           ) : (
             draft.topRefs.length === 0 && <p className="text-sm text-slate-700">上位タイトルが未登録のため、参考比較を省略して生成します。</p>
           )}
+          {staleSteps.length > 0 && (
+            <StepLinks title="再確認が必要な工程があります（生成はできます）。" items={staleSteps} locked={locked} onGo={goToStep} tone="warn" />
+          )}
           <p className="text-xs text-slate-500">本文にない数字・効果・実績などは加えません。参考上位は模倣や単純な言い換えには使いません。</p>
           <div>
-            <AiButton label="改善タイトルを10案生成する" busyLabel="生成中…" running={ai.running}
-              disabled={missing.length > 0} onClick={generate} />
+            <AiButton label={result ? "改善タイトルを10案生成し直す" : "改善タイトルを10案生成する"} busyLabel="生成中…"
+              running={ai.running} disabled={missing.length > 0} onClick={() => generate(false)} />
           </div>
-          <AiError message={ai.error} onRetry={generate} />
+          <AiError message={ai.error} onRetry={() => generate(draft.clarify !== null)} />
         </div>
 
+        {draft.clarify && (
+          <ClarifyPanel
+            clarify={draft.clarify}
+            running={ai.running}
+            onAnswer={(id, value) =>
+              update((d) => (d.clarify ? { ...d, clarify: { ...d.clarify, answers: { ...d.clarify.answers, [id]: value } } } : d))
+            }
+            onSubmit={() => generate(true)}
+          />
+        )}
+
         {!result ? (
-          <p className="rounded-md border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
-            まだ生成していません。条件を確認して「改善タイトルを10案生成する」を押してください。
-          </p>
+          !draft.clarify && (
+            <p className="rounded-md border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
+              まだ生成していません。条件を確認して「改善タイトルを10案生成する」を押してください。
+            </p>
+          )
         ) : (
           <div className="flex flex-col gap-3">
+            {recheck.titles && (
+              <StaleNotice title="変更前の条件で生成" message="生成したあとに条件が変わりました。下の候補は閲覧・コピーできますが、今の条件に合わせるには生成し直してください。" />
+            )}
             {result.isSample && <SampleNotice />}
-            <div role="tablist" aria-label="表示の切り替え" className="flex gap-2">
-              <button type="button" role="tab" aria-selected={view === "titles"} onClick={() => setView("titles")}
-                className={`rounded-md px-3 py-1.5 text-sm ${view === "titles" ? "bg-slate-800 text-white" : "border border-slate-300 bg-white text-slate-700"}`}>
-                改善候補 {result.items.length}案
-              </button>
-              <button type="button" role="tab" aria-selected={view === "refs"} onClick={() => setView("refs")}
-                className={`rounded-md px-3 py-1.5 text-sm ${view === "refs" ? "bg-slate-800 text-white" : "border border-slate-300 bg-white text-slate-700"}`}>
-                参考上位 {draft.topRefs.length}件
-              </button>
-            </div>
+            <ViewTabs view={view} setView={setView} titleLabel={`改善候補 ${result.items.length}案`} refCount={draft.topRefs.length} />
 
             {view === "titles" ? (
               <>
-                {issues.length > 0 && (
-                  <ul className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-                    {issues.map((issue, i) => (
-                      <li key={i}>{issue.index !== null ? `${issue.index + 1}番目：` : ""}{issue.message}</li>
-                    ))}
-                  </ul>
-                )}
+                <IssueList issues={issues} />
                 <ol className="flex flex-col gap-2">
                   {result.items.map((t, i) => (
                     <li key={i} className="grid gap-2 rounded-md border border-slate-200 p-3 md:grid-cols-[2rem_1fr_auto] md:items-start">

@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { inputClass } from "@/components/ui/Field";
+import { StaleNotice } from "@/components/ui/StaleNotice";
 import { LIMITS } from "@/lib/limits";
 import type { Errors } from "@/lib/validation";
 import { newId, nowLocalString, type TopRef, type TrendCategory } from "@/state/newDraft";
@@ -189,5 +190,43 @@ export function RefList({ refs }: { refs: TopRef[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+// ---- 古い参考情報の扱い（主キーワード変更後） ----
+
+type RefsHolder = { topRefs: TopRef[]; basis: { refsKeyword?: string } };
+
+/** 上位登録を変更する。最初の1件を登録したときの主キーワードを記録する */
+export function changeRefs<D extends RefsHolder>(d: D, fn: (refs: TopRef[]) => TopRef[], mainKeyword: string | null): D {
+  const refs = fn(d.topRefs);
+  let refsKeyword = d.basis.refsKeyword;
+  if (refs.length === 0) refsKeyword = undefined;
+  else if (d.topRefs.length === 0 || refsKeyword === undefined) refsKeyword = mainKeyword ?? "";
+  return { ...d, topRefs: refs, basis: { ...d.basis, refsKeyword } };
+}
+
+/** 新しい主キーワードで上位を確認し直し、同じ参考を使えると判断したとき。確認日時も更新する */
+export function confirmRefs<D extends RefsHolder>(d: D, mainKeyword: string | null): D {
+  const now = nowLocalString();
+  return {
+    ...d,
+    topRefs: d.topRefs.map((r) => ({ ...r, checkedAt: now })),
+    basis: { ...d.basis, refsKeyword: mainKeyword ?? "" },
+  };
+}
+
+export function StaleRefsNotice({
+  registeredKeyword, onConfirm, onReset,
+}: { registeredKeyword: string; onConfirm: () => void; onReset: () => void }) {
+  return (
+    <StaleNotice
+      title="上位情報は変更前の条件です"
+      message={`登録時の主キーワードは「${registeredKeyword || "未設定"}」です（未更新）。新しい主キーワードでGoogleを確認し、同じ参考を使える場合だけ「確認済みにする」を押してください。確認日時は今の時刻に更新されます。`}
+      actions={[
+        { label: "確認済みにする", onClick: onConfirm },
+        { label: "登録し直す（すべて削除）", onClick: onReset },
+      ]}
+    />
   );
 }

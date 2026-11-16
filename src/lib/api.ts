@@ -3,6 +3,7 @@
 
 import type { Keywords } from "@/state/workspace";
 import type {
+  ClarifyIssue,
   GeneratedTitle,
   KeywordInsight,
   NewDraft,
@@ -32,13 +33,23 @@ export type RewriteTitlesInput = {
   plan: RewriteDraft["plan"];
   tone: RewriteDraft["tone"];
   referenceTitles: string[];
+  supplements: Supplement[];
 };
+
+/** 補足質問への回答 */
+export type Supplement = { question: string; answer: string };
+
+/** 生成の結果。条件が足りないときは無理に10案を埋めず、補足質問を返す */
+export type GenerateOutcome<T> =
+  | { kind: "titles"; items: T[] }
+  | { kind: "clarify"; issues: ClarifyIssue[] };
 
 export type GenerateTitlesInput = {
   keywords: Keywords;
   plan: NewDraft["plan"];
   tone: NewDraft["tone"];
   referenceTitles: string[];
+  supplements: Supplement[];
 };
 
 export type TitleApi = {
@@ -48,7 +59,7 @@ export type TitleApi = {
     mainKeyword: string;
     refs: { id: string; title: string }[];
   }): Promise<TrendCategory[]>;
-  generateTitles(input: GenerateTitlesInput): Promise<GeneratedTitle[]>;
+  generateTitles(input: GenerateTitlesInput): Promise<GenerateOutcome<GeneratedTitle>>;
 
   // ---- タイトルリライト ----
   /** 記事URLの読み込み（AI処理ではないため利用回数に数えない） */
@@ -65,7 +76,7 @@ export type TitleApi = {
     body: string;
     refs: { id: string; title: string }[];
   }): Promise<Comparison>;
-  generateRewriteTitles(input: RewriteTitlesInput): Promise<ImprovedTitle[]>;
+  generateRewriteTitles(input: RewriteTitlesInput): Promise<GenerateOutcome<ImprovedTitle>>;
 };
 
 /** 今使っている実装がサンプルかどうか（画面に「サンプル」と表示するため） */

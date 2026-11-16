@@ -5,9 +5,11 @@
 import { useState } from "react";
 import { StepFooter } from "@/components/layout/StepFooter";
 import { StepHeading } from "@/components/layout/StepPlaceholder";
-import { TopRefsEditor, TrendTags } from "@/components/shared/TopRefsEditor";
+import { StaleRefsNotice, TopRefsEditor, TrendTags, changeRefs, confirmRefs } from "@/components/shared/TopRefsEditor";
 import { AiButton, AiError, useAiRunner } from "@/components/ui/AiButton";
 import { SampleNotice } from "@/components/ui/SampleNotice";
+import { StaleNotice } from "@/components/ui/StaleNotice";
+import { rewriteFingerprint, rewriteRecheck } from "@/lib/staleness";
 import { api } from "@/lib/api";
 import { LIMITS } from "@/lib/limits";
 import { isBlank } from "@/lib/text";
@@ -31,7 +33,13 @@ export function CompareStep() {
         refs: draft.topRefs.map((r) => ({ id: r.id, title: r.title.trim() })),
       }),
     );
-    if (result) update((d) => ({ ...d, comparison: result }));
+    if (result) update((d) => ({ ...d, comparison: result, basis: { ...d.basis, comparison: rewriteFingerprint.comparison(d, keywords) } }));
+  };
+
+  const recheck = rewriteRecheck(draft, keywords);
+  const resetRefs = () => {
+    if (!window.confirm("登録した上位タイトルと比較結果をすべて削除します。よろしいですか？")) return;
+    update((d) => ({ ...d, topRefs: [], comparison: null, basis: { ...d.basis, refsKeyword: undefined, comparison: undefined } }));
   };
 
   const c = draft.comparison;
@@ -46,9 +54,17 @@ export function CompareStep() {
           <p><span className="text-slate-500">対象キーワード：</span>{keywords.main ?? "未設定"}</p>
         </div>
 
+        {recheck.refs && (
+          <StaleRefsNotice
+            registeredKeyword={draft.basis.refsKeyword ?? ""}
+            onConfirm={() => update((d) => confirmRefs(d, keywords.main))}
+            onReset={resetRefs}
+          />
+        )}
+
         <TopRefsEditor
           refs={draft.topRefs}
-          onChange={(fn) => update((d) => ({ ...d, topRefs: fn(d.topRefs) }))}
+          onChange={(fn) => update((d) => changeRefs(d, fn, keywords.main))}
           mainKeyword={keywords.main}
           errors={errors}
           showErrors={showErrors}
@@ -60,7 +76,9 @@ export function CompareStep() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-slate-900">現在のタイトルと比較</h2>
-              <p className="text-xs text-slate-500">状態：{ai.running ? "比較中" : c ? "比較済み" : "比較前"}</p>
+              <p className="text-xs text-slate-500">
+                状態：{ai.running ? "比較中" : !c ? "比較前" : recheck.comparison ? "条件変更後（再比較が必要）" : "比較済み"}
+              </p>
             </div>
             <AiButton label="上位タイトルと比較する" busyLabel="比較中…" running={ai.running}
               disabled={draft.topRefs.length === 0} onClick={compare} />
@@ -69,6 +87,9 @@ export function CompareStep() {
             <p className="text-xs text-slate-500">登録された{draft.topRefs.length}件で比較します。</p>
           )}
           <AiError message={ai.error} onRetry={compare} />
+          {recheck.comparison && (
+            <StaleNotice title="上位情報は変更前の条件です" message="比較したあとに、上位タイトル・主キーワード・現在のタイトル・本文のいずれかが変わりました。下の比較は変更前の条件の結果です。再比較してください。" />
+          )}
           {c && (
             <div className="flex flex-col gap-4">
               <SampleNotice />

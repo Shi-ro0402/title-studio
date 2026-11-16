@@ -51,6 +51,35 @@ export type TitleResult = {
   isSample: boolean;
 };
 
+/** 補足質問（確認が必要な点） */
+export type ClarifyIssue = {
+  id: string;
+  /** 不足・不一致の理由 */
+  reason: string;
+  question: string;
+  /** 選択肢（あれば押すだけで回答欄に入る） */
+  choices?: string[];
+};
+
+export type Clarification = {
+  issues: ClarifyIssue[];
+  answers: Record<string, string>;
+};
+
+/**
+ * 各結果を作ったときの条件の「指紋」（条件を文字列にしたもの）。
+ * 今の条件の指紋と違えば、結果は「変更前の条件」のものと判断する。
+ */
+export type NewBasis = {
+  insights?: string;
+  /** 企画を確認・提案したときの主キーワード */
+  plan?: string;
+  /** 上位タイトルを登録・確認したときの主キーワード */
+  refsKeyword?: string;
+  trend?: string;
+  titles?: string;
+};
+
 export type NewDraft = {
   candidates: Candidate[];
   keywordInsights: KeywordInsight[] | null;
@@ -62,6 +91,9 @@ export type NewDraft = {
   topRefs: TopRef[];
   trend: TrendCategory[] | null;
   titles: TitleResult | null;
+  basis: NewBasis;
+  /** タイトル生成で返ってきた補足質問。null なら質問なし */
+  clarify: Clarification | null;
 };
 
 export const PLAN_FIELDS: PlanField[] = ["theme", "persona", "question", "summary", "strength"];
@@ -89,6 +121,8 @@ export const initialNewDraft: NewDraft = {
   topRefs: [],
   trend: null,
   titles: null,
+  basis: {},
+  clarify: null,
 };
 
 let idCounter = 0;

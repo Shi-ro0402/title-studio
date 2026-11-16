@@ -11,7 +11,9 @@ import { Field, RequiredBadge, inputClass } from "@/components/ui/Field";
 import { RESEARCH_SITES } from "@/lib/externalLinks";
 import { LIMITS } from "@/lib/limits";
 import { hasErrors, validateRewriteKeywordStep } from "@/lib/validation";
-import { SOURCE_LABEL, type Candidate } from "@/state/newDraft";
+import { StaleNotice } from "@/components/ui/StaleNotice";
+import { rewriteFingerprint, rewriteRecheck } from "@/lib/staleness";
+import { SOURCE_LABEL, nowLocalString, type Candidate } from "@/state/newDraft";
 import { RANK_STATUS_LABEL, type RankRecord, type RankStatus, type RewriteDraft } from "@/state/rewriteDraft";
 import { useRewriteDraft } from "./useRewriteDraft";
 
@@ -24,7 +26,13 @@ export function KeywordRankStep() {
   const errors = validateRewriteKeywordStep(draft, keywords);
   const rank = draft.rank;
 
-  const editRank = (patch: Partial<RankRecord>) => update((d) => ({ ...d, rank: { ...d.rank, ...patch } }));
+  // 順位を記録・修正したら、そのときのURLと主キーワードを記録する
+  const editRank = (patch: Partial<RankRecord>) =>
+    update((d) => {
+      const next = { ...d, rank: { ...d.rank, ...patch } };
+      return { ...next, basis: { ...next.basis, rank: rewriteFingerprint.rank(next, keywords) } };
+    });
+  const recheck = rewriteRecheck(draft, keywords);
   const editDemand = (patch: Partial<RewriteDraft["demand"]>) => update((d) => ({ ...d, demand: { ...d.demand, ...patch } }));
 
   const submitMain = (word: string) => {
@@ -153,6 +161,17 @@ export function KeywordRankStep() {
               className="w-fit rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 hover:bg-slate-100">
               「{keywords.main}」をGoogleで検索 ↗
             </a>
+          )}
+
+          {recheck.rank && (
+            <StaleNotice
+              title="順位は未更新です"
+              message="記録した順位は、記事URLまたは主キーワードを変更する前のものです。新しい条件でGoogleを確認し直してください。"
+              actions={[
+                { label: "確認し直した（確認日時を今にする）", onClick: () => editRank({ checkedAt: nowLocalString() }) },
+                { label: "未確認に戻す", onClick: () => editRank({ status: "unchecked" }) },
+              ]}
+            />
           )}
 
           <fieldset className="flex flex-wrap gap-3">

@@ -2,6 +2,7 @@
 // 画面と操作を先に作るためのもので、段階5（URL読み込み）・段階6（Claude API）で差し替える。
 
 import type { TitleApi } from "@/lib/api";
+import { countChars } from "@/lib/text";
 import { SAMPLE_ARTICLE, SAMPLE_IMPROVED_TITLES, SAMPLE_TITLES } from "./sampleData";
 
 const WAIT_MS = 1200;
@@ -54,9 +55,23 @@ export const mockApi: TitleApi = {
     return sampleTrend(refs);
   },
 
-  async generateTitles() {
+  async generateTitles({ plan, supplements }) {
     await wait();
-    return SAMPLE_TITLES.map((t) => ({ ...t }));
+    // サンプルの判定：ペルソナが短すぎる場合は、補足質問を返す（補足があれば生成する）
+    if (countChars(plan.persona) < 15 && supplements.length === 0) {
+      return {
+        kind: "clarify",
+        issues: [
+          {
+            id: "persona",
+            reason: "ペルソナ（想定読者）の説明が短く、誰に向けたタイトルにすればよいか判断できません。",
+            question: "この記事を最も読んでほしい人は、どれに近いですか？（自由入力も可）",
+            choices: ["初めて取り組む初心者", "基本は知っていて、比較・検討している人", "すでに取り組んでいて、改善したい人"],
+          },
+        ],
+      };
+    }
+    return { kind: "titles", items: SAMPLE_TITLES.map((t) => ({ ...t })) };
   },
 
   async fetchArticle() {
@@ -88,8 +103,24 @@ export const mockApi: TitleApi = {
     };
   },
 
-  async generateRewriteTitles() {
+  async generateRewriteTitles({ keywords, currentTitle, body, supplements }) {
     await wait();
-    return SAMPLE_IMPROVED_TITLES.map((t) => ({ ...t }));
+    // サンプルの判定：主キーワードの語が記事に見当たらない場合は、補足質問を返す
+    const text = `${currentTitle}\n${body}`.toLowerCase();
+    const words = (keywords.main ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+    const missing = words.filter((w) => !text.includes(w));
+    if (missing.length > 0 && supplements.length === 0) {
+      return {
+        kind: "clarify",
+        issues: [
+          {
+            id: "keyword-body",
+            reason: `主キーワードの「${missing.join("」「")}」が、現在のタイトル・本文に見当たりません。キーワードと本文が合っていない可能性があります。`,
+            question: "本文のどの部分がこのキーワードに答えていますか？ 抽出漏れがあれば補足してください。キーワードを見直す場合は②へ戻ってください。",
+          },
+        ],
+      };
+    }
+    return { kind: "titles", items: SAMPLE_IMPROVED_TITLES.map((t) => ({ ...t })) };
   },
 };

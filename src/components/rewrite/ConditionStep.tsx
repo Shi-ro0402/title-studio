@@ -13,7 +13,9 @@ import {
   editedOrigin,
   type FieldDef,
 } from "@/components/shared/PlanFieldsEditor";
+import { StaleNotice } from "@/components/ui/StaleNotice";
 import { LIMITS } from "@/lib/limits";
+import { rewriteFingerprint, rewriteRecheck } from "@/lib/staleness";
 import { isBlank } from "@/lib/text";
 import { hasErrors, validateConditionStep } from "@/lib/validation";
 import type { RewritePlanField } from "@/state/rewriteDraft";
@@ -33,6 +35,10 @@ export function ConditionStep() {
   const [showErrors, setShowErrors] = useState(false);
   const errors = validateConditionStep(draft);
   const analyzed = draft.keywordCandidates !== null;
+  const recheck = rewriteRecheck(draft, keywords);
+  // 今の主キーワード・本文で条件を確認した、と記録する
+  const confirmCondition = () =>
+    update((d) => ({ ...d, basis: { ...d.basis, condition: rewriteFingerprint.condition(d, keywords) } }));
 
   return (
     <>
@@ -49,6 +55,17 @@ export function ConditionStep() {
             </p>
           )}
         </div>
+
+        {recheck.condition && (
+          <StaleNotice
+            title="キーワードまたは本文の変更後、未確認"
+            message="条件を確認したあとに、主キーワードまたは本文が変わりました。下の内容が今のキーワード・本文と合っているか確認してください。"
+            actions={[{ label: "今の内容で確認済みにする", onClick: confirmCondition }]}
+          />
+        )}
+        {recheck.analysis && (
+          <StaleNotice title="AI推定は変更前の本文にもとづいています" message="「AI推定」の項目は、本文を変更する前の分析結果です。必要に応じて①で再分析するか、手で修正してください。" />
+        )}
 
         <p className="text-sm text-slate-700">
           AIの推定内容が本文と合っているかを確認してから、次へ進んでください。リライトでは、現在の記事の内容を保ち、タイトルの伝わり方を改善します。
@@ -81,7 +98,9 @@ export function ConditionStep() {
       <StepFooter
         onBeforeNext={() => {
           setShowErrors(true);
-          return !hasErrors(validateConditionStep(draft));
+          const ok = !hasErrors(validateConditionStep(draft));
+          if (ok) confirmCondition();
+          return ok;
         }}
       />
     </>

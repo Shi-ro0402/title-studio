@@ -9,6 +9,8 @@ import { mergeSuggestion } from "@/components/shared/PlanFieldsEditor";
 import { AiButton, AiError, useAiRunner } from "@/components/ui/AiButton";
 import { Field, inputClass } from "@/components/ui/Field";
 import { SampleNotice } from "@/components/ui/SampleNotice";
+import { StaleNotice } from "@/components/ui/StaleNotice";
+import { rewriteFingerprint, rewriteRecheck } from "@/lib/staleness";
 import { USING_SAMPLE_API, api } from "@/lib/api";
 import { LIMITS } from "@/lib/limits";
 import { countChars, isBlank, isHttpUrl } from "@/lib/text";
@@ -45,7 +47,7 @@ export function LoadStep() {
     update((d) => ({
       ...d,
       inputMethod: "url",
-      loaded: { title: result.title, body: result.body, headings },
+      loaded: { url: d.url.trim(), title: result.title, body: result.body, headings },
       currentTitle: result.title,
       body: result.body,
       headings,
@@ -63,10 +65,12 @@ export function LoadStep() {
       ...mergeSuggestion(d, result.plan),
       // 選択済みのキーワードは自動で上書きせず、候補として残す
       keywordCandidates: result.keywordCandidates,
+      basis: { ...d.basis, analysis: rewriteFingerprint.analysis(d) },
     }));
   };
 
   const fetchFailed = fetcher.error !== null;
+  const recheck = rewriteRecheck(draft, keywords);
 
   return (
     <>
@@ -96,6 +100,12 @@ export function LoadStep() {
             </p>
           )}
           <AiError message={fetcher.error} onRetry={load} />
+          {recheck.url && (
+            <StaleNotice
+              title="URLが変更されています（未読み込み）"
+              message={`下の内容は、変更前のURL（${draft.loaded?.url}）から読み込んだものです。新しいURLの記事として扱うには「読み込む」を押すか、本文を貼り付け直してください。順位・上位比較・改善案も新しい記事で確認し直してください。`}
+            />
+          )}
           {draft.loaded && USING_SAMPLE_API && <SampleNotice />}
           <button type="button" disabled={locked}
             onClick={() => {
@@ -160,6 +170,9 @@ export function LoadStep() {
           {isBlank(draft.body) && <p className="text-xs text-slate-500">本文を読み込むか貼り付けると、分析できます。</p>}
           {bodyOver && <p className="text-xs text-red-700">本文が{LIMITS.body.toLocaleString()}文字以内になると、分析できます。</p>}
           <AiError message={analyzer.error} onRetry={analyze} />
+          {recheck.analysis && (
+            <StaleNotice title="本文変更後、未確認" message="分析したあとに、現在のタイトル・本文・見出しが変わりました。②のキーワード候補と③のAI推定は変更前の内容にもとづいています。必要に応じて再分析してください。" />
+          )}
           {draft.keywordCandidates && (
             <div className="flex flex-col gap-2">
               <SampleNotice />

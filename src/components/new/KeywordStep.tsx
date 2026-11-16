@@ -10,6 +10,8 @@ import { useKeywordOps } from "@/components/shared/useKeywordOps";
 import { AiButton, AiError, useAiRunner } from "@/components/ui/AiButton";
 import { RequiredBadge, inputClass } from "@/components/ui/Field";
 import { SampleNotice } from "@/components/ui/SampleNotice";
+import { StaleNotice } from "@/components/ui/StaleNotice";
+import { newFingerprint, newRecheck } from "@/lib/staleness";
 import { api } from "@/lib/api";
 import { RESEARCH_SITES } from "@/lib/externalLinks";
 import { LIMITS } from "@/lib/limits";
@@ -25,6 +27,7 @@ export function KeywordStep() {
   const [showErrors, setShowErrors] = useState(false);
 
   const errors = validateKeywordStep(draft, keywords);
+  const recheck = newRecheck(draft, keywords);
   const visibleError = (key: string) => (showErrors ? errors[key] : undefined);
   const filledCandidates = draft.candidates.filter((c) => !isBlank(c.keyword));
 
@@ -51,7 +54,9 @@ export function KeywordStep() {
   const analyze = async () => {
     const words = filledCandidates.map((c) => c.keyword.trim());
     const result = await ai.run("候補を分析中", () => api.analyzeKeywords({ keywords: words }));
-    if (result) update((d) => ({ ...d, keywordInsights: result }));
+    if (result) {
+      update((d) => ({ ...d, keywordInsights: result, basis: { ...d.basis, insights: newFingerprint.insights(d) } }));
+    }
   };
 
   return (
@@ -145,7 +150,7 @@ export function KeywordStep() {
             <div>
               <h2 className="text-base font-bold text-slate-900">候補の分析</h2>
               <p className="text-xs text-slate-500">
-                状態：{ai.running ? "分析中" : draft.keywordInsights ? "分析済み" : "分析前"}
+                状態：{ai.running ? "分析中" : !draft.keywordInsights ? "分析前" : recheck.insights ? "条件変更後（再分析が必要）" : "分析済み"}
               </p>
             </div>
             <AiButton
@@ -160,6 +165,9 @@ export function KeywordStep() {
             <p className="text-xs text-slate-500">キーワードを1件以上入力すると分析できます。</p>
           )}
           <AiError message={ai.error} onRetry={analyze} />
+          {recheck.insights && (
+            <StaleNotice title="候補が変更されています" message="下の分析結果は変更前の候補のものです。必要に応じて「候補を分析する」で再分析してください。" />
+          )}
           {draft.keywordInsights && (
             <div className="flex flex-col gap-3">
               <SampleNotice />

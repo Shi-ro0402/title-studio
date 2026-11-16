@@ -2,17 +2,19 @@
 
 import { useState } from "react";
 import { STEP_STATUS_LABEL, stepNumber, type StepStatus } from "@/lib/steps";
-import { useCurrentMode, useWorkspaceDispatch } from "@/state/workspace";
+import { useCurrentMode, useRecheckSteps, useWorkspaceDispatch } from "@/state/workspace";
 import { MODE_THEME } from "./modeTheme";
 
 export function StepNav() {
   const { mode, steps, stepIndex, stepStatus, locked } = useCurrentMode();
+  const recheck = useRecheckSteps();
   const dispatch = useWorkspaceDispatch();
   const theme = MODE_THEME[mode];
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // 「再確認が必要」は、現在の工程でも優先して表示する
   const statusOf = (i: number): StepStatus =>
-    i === stepIndex ? "current" : stepStatus[i];
+    recheck[i] ? "recheck" : i === stepIndex ? "current" : stepStatus[i];
 
   const go = (i: number) => {
     dispatch({ type: "goToStep", step: i });
@@ -72,6 +74,9 @@ export function StepNav() {
           <p className="text-sm font-bold text-slate-800">
             {stepNumber(stepIndex)} {steps[stepIndex].label}
             <span className="font-normal text-slate-500">／全{steps.length}工程</span>
+            {recheck.some(Boolean) && (
+              <span className="ml-2 text-xs font-bold text-amber-700">再確認が必要な工程あり</span>
+            )}
           </p>
           <button
             type="button"

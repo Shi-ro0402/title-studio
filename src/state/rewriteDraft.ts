@@ -3,6 +3,7 @@
 import {
   todayString,
   type Candidate,
+  type Clarification,
   type Origin,
   type Tone,
   type TopRef,
@@ -56,9 +57,21 @@ export type Comparison = {
 
 /** URLから読み込んだ直後の内容。編集済みかどうかの判定に使う */
 export type LoadedSnapshot = {
+  /** 読み込んだURL */
+  url: string;
   title: string;
   body: string;
   headings: string;
+};
+
+/** 各結果を作ったときの条件の指紋（newDraft.ts の NewBasis と同じ考え方） */
+export type RewriteBasis = {
+  analysis?: string;
+  rank?: string;
+  condition?: string;
+  refsKeyword?: string;
+  comparison?: string;
+  titles?: string;
 };
 
 export type RewriteDraft = {
@@ -81,6 +94,8 @@ export type RewriteDraft = {
   topRefs: TopRef[];
   comparison: Comparison | null;
   titles: { items: ImprovedTitle[]; generatedAt: string; isSample: boolean } | null;
+  basis: RewriteBasis;
+  clarify: Clarification | null;
 };
 
 const emptyPlan: Record<RewritePlanField, string> = {
@@ -128,6 +143,8 @@ export const initialRewriteDraft: RewriteDraft = {
   topRefs: [],
   comparison: null,
   titles: null,
+  basis: {},
+  clarify: null,
 };
 
 /** URLから読み込んだあとに、タイトル・本文・見出しを手で直したか */

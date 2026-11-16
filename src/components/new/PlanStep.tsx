@@ -16,6 +16,8 @@ import {
 } from "@/components/shared/PlanFieldsEditor";
 import { AiButton, AiError, useAiRunner } from "@/components/ui/AiButton";
 import { SampleNotice } from "@/components/ui/SampleNotice";
+import { StaleNotice } from "@/components/ui/StaleNotice";
+import { newRecheck } from "@/lib/staleness";
 import { api } from "@/lib/api";
 import { LIMITS } from "@/lib/limits";
 import { isBlank } from "@/lib/text";
@@ -39,8 +41,12 @@ export function PlanStep() {
 
   const suggest = async () => {
     const result = await ai.run("企画を提案中", () => api.suggestPlan({ keywords }));
-    if (result) update((d) => ({ ...d, ...mergeSuggestion(d, result) }));
+    if (result) update((d) => ({ ...d, ...mergeSuggestion(d, result), basis: { ...d.basis, plan: keywords.main ?? "" } }));
   };
+
+  // 今の主キーワードで企画を確認した、と記録する
+  const confirmPlan = () => update((d) => ({ ...d, basis: { ...d.basis, plan: keywords.main ?? "" } }));
+  const recheck = newRecheck(draft, keywords);
 
   const hasAiValue = Object.values(draft.planOrigin).some((o) => o !== "none");
 
@@ -48,6 +54,14 @@ export function PlanStep() {
     <>
       <section aria-labelledby="step-title" className="flex flex-col gap-6">
         <StepHeading />
+
+        {recheck.plan && (
+          <StaleNotice
+            title="キーワード変更後、未確認"
+            message={`企画を確認したときの主キーワードは「${draft.basis.plan || "未設定"}」です。今の主キーワードに合っているか確認し、必要なら修正または再提案してください。`}
+            actions={[{ label: "今の内容で確認済みにする", onClick: confirmPlan }]}
+          />
+        )}
 
         <div className="flex flex-col gap-3 rounded-md border border-slate-200 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -122,7 +136,9 @@ export function PlanStep() {
       <StepFooter
         onBeforeNext={() => {
           setShowErrors(true);
-          return !hasErrors(validatePlanStep(draft));
+          const ok = !hasErrors(validatePlanStep(draft));
+          if (ok) confirmPlan();
+          return ok;
         }}
       />
     </>

@@ -10,6 +10,7 @@ import {
   type Dispatch,
   type ReactNode,
 } from "react";
+import { newRecheck, rewriteRecheck } from "@/lib/staleness";
 import { STEPS, type Mode, type StepStatus } from "@/lib/steps";
 import { initialNewDraft, type NewDraft } from "./newDraft";
 import { initialRewriteDraft, type RewriteDraft } from "./rewriteDraft";
@@ -46,6 +47,7 @@ export type WorkspaceAction =
   | { type: "setKeywords"; mode: Mode; keywords: Keywords }
   | { type: "updateNew"; update: (draft: NewDraft) => NewDraft }
   | { type: "updateRewrite"; update: (draft: RewriteDraft) => RewriteDraft }
+  | { type: "clearMode" }
   | { type: "openHistory" }
   | { type: "closeHistory" }
   | { type: "startProcessing"; label: string }
@@ -126,6 +128,15 @@ function reducer(
     case "updateRewrite":
       return { ...state, rewriteDraft: action.update(state.rewriteDraft) };
 
+    case "clearMode": {
+      // 現在のモードの一時入力だけをリセットする（生成履歴は削除しない）
+      if (state.processing) return state;
+      const modes = { ...state.modes, [state.mode]: initialModeState(state.mode) };
+      return state.mode === "new"
+        ? { ...state, modes, newDraft: initialNewDraft }
+        : { ...state, modes, rewriteDraft: initialRewriteDraft };
+    }
+
     case "openHistory":
       if (state.processing) return state;
       return { ...state, historyOpen: true };
@@ -165,6 +176,25 @@ export function useWorkspaceDispatch(): Dispatch<WorkspaceAction> {
   const value = useContext(DispatchContext);
   if (!value) throw new Error("WorkspaceProvider の中で使ってください");
   return value;
+}
+
+/** 工程ごとに「再確認が必要」かどうか */
+export function useRecheckSteps(): boolean[] {
+  const state = useWorkspace();
+  return state.mode === "new"
+    ? newRecheck(state.newDraft, state.modes.new.keywords).steps
+    : rewriteRecheck(state.rewriteDraft, state.modes.rewrite.keywords).steps;
+}
+
+/** 作業途中の入力があるか（ページ離脱時の確認に使う） */
+export function hasWorkInProgress(state: WorkspaceState): boolean {
+  const kw = (m: Mode) => state.modes[m].keywords.main !== null || state.modes[m].keywords.sub.length > 0;
+  return (
+    state.newDraft !== initialNewDraft ||
+    state.rewriteDraft !== initialRewriteDraft ||
+    kw("new") ||
+    kw("rewrite")
+  );
 }
 
 /** 現在のモードの状態をまとめて取り出す */
