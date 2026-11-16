@@ -1,12 +1,13 @@
 "use client";
 
+import { useHistory } from "@/lib/history";
 import { useWorkspace, useWorkspaceDispatch } from "@/state/workspace";
 
 export function Header() {
   const { processing } = useWorkspace();
   const dispatch = useWorkspaceDispatch();
-  // 履歴の保存は段階7で実装する。それまでは実際の保存件数として 0 を表示する
-  const historyCount = 0;
+  // 実際に保存されている件数（最大20件）
+  const historyCount = useHistory().length;
 
   return (
     <header className="border-b border-slate-200 bg-white">

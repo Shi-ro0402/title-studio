@@ -1,5 +1,7 @@
 // 新規作成モードの作業データの形
 
+import type { HistoryEntry, SaveStatus } from "@/lib/history";
+
 export type Candidate = {
   id: string;
   keyword: string;
@@ -49,6 +51,9 @@ export type TitleResult = {
   generatedAt: string;
   /** 開発用のサンプル結果かどうか */
   isSample: boolean;
+  /** この生成結果の履歴（保存の再試行に使う。生成に使った条件を記録済み） */
+  entry: HistoryEntry;
+  saveStatus: SaveStatus;
 };
 
 /** 補足質問（確認が必要な点） */

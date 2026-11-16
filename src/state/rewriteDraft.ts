@@ -1,5 +1,7 @@
 // タイトルリライトモードの作業データの形
 
+import type { HistoryEntry, SaveStatus } from "@/lib/history";
+
 import {
   todayString,
   type Candidate,
@@ -95,7 +97,13 @@ export type RewriteDraft = {
   tone: Tone;
   topRefs: TopRef[];
   comparison: Comparison | null;
-  titles: { items: ImprovedTitle[]; generatedAt: string; isSample: boolean } | null;
+  titles: {
+    items: ImprovedTitle[];
+    generatedAt: string;
+    isSample: boolean;
+    entry: HistoryEntry;
+    saveStatus: SaveStatus;
+  } | null;
   basis: RewriteBasis;
   clarify: Clarification | null;
 };

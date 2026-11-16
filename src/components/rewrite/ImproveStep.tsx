@@ -12,6 +12,8 @@ import { AiButton, AiError, useAiRunner } from "@/components/ui/AiButton";
 import { SampleNotice } from "@/components/ui/SampleNotice";
 import { StaleNotice } from "@/components/ui/StaleNotice";
 import { copyText, useToast } from "@/components/ui/Toast";
+import { SaveStatusBar, autoSave } from "@/components/shared/SaveStatusBar";
+import { buildRewriteEntry, saveHistoryEntry } from "@/lib/history";
 import { USING_SAMPLE_API, api } from "@/lib/api";
 import { rewriteFingerprint, rewriteRecheck } from "@/lib/staleness";
 import { countChars, isBlank } from "@/lib/text";
@@ -65,13 +67,25 @@ export function ImproveStep() {
       update((d) => ({ ...d, clarify: { issues: outcome.issues, answers: {} } }));
       return;
     }
+    // 生成に使った条件で履歴を作り、確認を通った結果だけを自動保存する（本文・見出しは保存しない）
+    const entry = buildRewriteEntry(draft, keywords, outcome.items);
+    const saveStatus = autoSave(entry, checkTitles(outcome.items.map((t) => t.text), referenceTitles).length === 0);
     update((d) => ({
       ...d,
-      titles: { items: outcome.items, generatedAt: new Date().toISOString(), isSample: USING_SAMPLE_API },
+      titles: { items: outcome.items, generatedAt: entry.createdAt, isSample: USING_SAMPLE_API, entry, saveStatus },
       basis: { ...d.basis, titles: rewriteFingerprint.titles(d, keywords) },
       clarify: null,
     }));
+    if (saveStatus === "saved") toast("履歴に保存しました");
+    if (saveStatus === "failed") toast("履歴に保存できませんでした", "error");
     setView("titles");
+  };
+
+  const retrySave = () => {
+    if (!draft.titles) return;
+    const ok = saveHistoryEntry(draft.titles.entry);
+    update((d) => (d.titles ? { ...d, titles: { ...d.titles, saveStatus: ok ? "saved" : "failed" } } : d));
+    toast(ok ? "履歴に保存しました" : "履歴に保存できませんでした", ok ? "success" : "error");
   };
 
   const copy = async (text: string) => {
@@ -133,6 +147,7 @@ export function ImproveStep() {
             {recheck.titles && (
               <StaleNotice title="変更前の条件で生成" message="生成したあとに条件が変わりました。下の候補は閲覧・コピーできますが、今の条件に合わせるには生成し直してください。" />
             )}
+            <SaveStatusBar status={result.saveStatus} onRetry={retrySave} />
             {result.isSample && <SampleNotice />}
             <ViewTabs view={view} setView={setView} titleLabel={`改善候補 ${result.items.length}案`} refCount={draft.topRefs.length} />
 
