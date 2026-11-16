@@ -62,6 +62,8 @@ export type LoadedSnapshot = {
   title: string;
   body: string;
   headings: string;
+  /** 本文中の画像の枚数（内容は確認していない） */
+  imageCount: number;
 };
 
 /** 各結果を作ったときの条件の指紋（newDraft.ts の NewBasis と同じ考え方） */

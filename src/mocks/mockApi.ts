@@ -76,7 +76,7 @@ export const mockApi: TitleApi = {
 
   async fetchArticle() {
     await wait();
-    return { ...SAMPLE_ARTICLE, headings: [...SAMPLE_ARTICLE.headings] };
+    return { ...SAMPLE_ARTICLE, headings: [...SAMPLE_ARTICLE.headings], imageCount: 0 };
   },
 
   async analyzeArticle() {

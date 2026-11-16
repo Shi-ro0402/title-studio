@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { MODE_THEME } from "@/components/layout/modeTheme";
+import { UserFacingError } from "@/lib/userError";
 import { useCurrentMode, useWorkspace, useWorkspaceDispatch } from "@/state/workspace";
 
 type AiButtonProps = {
@@ -48,8 +49,13 @@ export function useAiRunner() {
     dispatch({ type: "startProcessing", label: stageLabel });
     try {
       return await task();
-    } catch {
-      setError("処理に失敗しました。入力内容はそのまま残っています。もう一度お試しください。");
+    } catch (e) {
+      // 理由がわかるエラーはそのまま見せる。それ以外は共通の文言にする
+      setError(
+        e instanceof UserFacingError
+          ? `${e.message}（入力内容はそのまま残っています）`
+          : "処理に失敗しました。入力内容はそのまま残っています。もう一度お試しください。",
+      );
       return undefined;
     } finally {
       dispatch({ type: "endProcessing" });

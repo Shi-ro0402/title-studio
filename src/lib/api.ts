@@ -12,6 +12,7 @@ import type {
 } from "@/state/newDraft";
 import type { Comparison, ImprovedTitle, RewriteDraft, RewritePlanField } from "@/state/rewriteDraft";
 import { mockApi } from "@/mocks/mockApi";
+import { fetchArticle } from "./fetchArticleClient";
 
 export type PlanSuggestion = Partial<Record<PlanField, string>>;
 
@@ -19,6 +20,10 @@ export type FetchedArticle = {
   title: string;
   body: string;
   headings: string[];
+  /** 本文中の画像の枚数（内容は確認していない） */
+  imageCount: number;
+  /** 転送後の最終的なURL */
+  finalUrl?: string;
 };
 
 export type ArticleAnalysis = {
@@ -79,7 +84,8 @@ export type TitleApi = {
   generateRewriteTitles(input: RewriteTitlesInput): Promise<GenerateOutcome<ImprovedTitle>>;
 };
 
-/** 今使っている実装がサンプルかどうか（画面に「サンプル」と表示するため） */
+/** AI処理がサンプルかどうか（画面に「サンプル」と表示するため）。段階6で false にする */
 export const USING_SAMPLE_API = true;
 
-export const api: TitleApi = mockApi;
+// 記事URLの読み込みは本物（段階5）。AI処理はまだサンプル。
+export const api: TitleApi = { ...mockApi, fetchArticle };

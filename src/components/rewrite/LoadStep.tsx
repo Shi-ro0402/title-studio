@@ -11,7 +11,7 @@ import { Field, inputClass } from "@/components/ui/Field";
 import { SampleNotice } from "@/components/ui/SampleNotice";
 import { StaleNotice } from "@/components/ui/StaleNotice";
 import { rewriteFingerprint, rewriteRecheck } from "@/lib/staleness";
-import { USING_SAMPLE_API, api } from "@/lib/api";
+import { api } from "@/lib/api";
 import { LIMITS } from "@/lib/limits";
 import { countChars, isBlank, isHttpUrl } from "@/lib/text";
 import { hasErrors, validateLoadStep } from "@/lib/validation";
@@ -47,7 +47,7 @@ export function LoadStep() {
     update((d) => ({
       ...d,
       inputMethod: "url",
-      loaded: { url: d.url.trim(), title: result.title, body: result.body, headings },
+      loaded: { url: d.url.trim(), title: result.title, body: result.body, headings, imageCount: result.imageCount },
       currentTitle: result.title,
       body: result.body,
       headings,
@@ -94,19 +94,28 @@ export function LoadStep() {
           <p className="text-xs text-slate-500">
             「読み込む」はページの取得だけを行い、AIの利用回数は減りません。リンク先の別ページや、画像内の文字は読み込みません。
           </p>
-          {fetchFailed && (
-            <p className="text-sm text-red-700">
-              記事を読み込めませんでした。URLを確認して再試行するか、下の欄にタイトルと本文を貼り付けてください。
-            </p>
-          )}
           <AiError message={fetcher.error} onRetry={load} />
+          {fetchFailed && (
+            <p className="text-sm text-slate-700">下の欄にタイトルと本文を貼り付けて、続けることもできます。</p>
+          )}
+          {draft.loaded && !recheck.url && !fetcher.running && (
+            <div className="rounded-md bg-teal-50 px-3 py-2 text-xs text-teal-900">
+              <p>
+                読み込みました。メニュー・広告・関連記事などは除いています。抜けている部分があれば、下の本文欄で補足してください。
+              </p>
+              {draft.loaded.imageCount > 0 && (
+                <p className="mt-1 font-bold">
+                  本文中の画像 {draft.loaded.imageCount}件は確認していません。画像内の文字や図表に大事な内容があれば、文章で補足してください。
+                </p>
+              )}
+            </div>
+          )}
           {recheck.url && (
             <StaleNotice
               title="URLが変更されています（未読み込み）"
               message={`下の内容は、変更前のURL（${draft.loaded?.url}）から読み込んだものです。新しいURLの記事として扱うには「読み込む」を押すか、本文を貼り付け直してください。順位・上位比較・改善案も新しい記事で確認し直してください。`}
             />
           )}
-          {draft.loaded && USING_SAMPLE_API && <SampleNotice />}
           <button type="button" disabled={locked}
             onClick={() => {
               update((d) => ({ ...d, inputMethod: "paste" }));
