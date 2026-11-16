@@ -5,15 +5,17 @@ import { Header } from "./Header";
 import { HistoryPanel } from "./HistoryPanel";
 import { KeywordSummary } from "./KeywordSummary";
 import { MODE_THEME } from "./modeTheme";
+import { ToastProvider } from "@/components/ui/Toast";
 import { ModeSwitcher } from "./ModeSwitcher";
-import { StepFooter } from "./StepFooter";
+import { StepContent } from "./StepContent";
 import { StepNav } from "./StepNav";
-import { StepPlaceholder } from "./StepPlaceholder";
 
 export function AppShell() {
   return (
     <WorkspaceProvider>
-      <Workspace />
+      <ToastProvider>
+        <Workspace />
+      </ToastProvider>
     </WorkspaceProvider>
   );
 }
@@ -38,8 +40,7 @@ function Workspace() {
         )}
         <KeywordSummary />
         <div className="flex flex-col gap-6 rounded-lg bg-white p-4 shadow-sm sm:p-6">
-          <StepPlaceholder />
-          <StepFooter />
+          <StepContent />
         </div>
         <p className="text-xs text-slate-600">
           作業途中の内容は保存しません。生成成功時の履歴のみ保存します。

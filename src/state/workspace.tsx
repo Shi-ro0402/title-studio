@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { STEPS, type Mode, type StepStatus } from "@/lib/steps";
+import { initialNewDraft, type NewDraft } from "./newDraft";
 
 export type Keywords = {
   main: string | null;
@@ -28,6 +29,8 @@ type ModeState = {
 export type WorkspaceState = {
   mode: Mode;
   modes: Record<Mode, ModeState>;
+  /** 新規作成の作業データ */
+  newDraft: NewDraft;
   /** AI処理・URL取得中の段階名。null なら処理していない */
   processing: string | null;
   historyOpen: boolean;
@@ -36,6 +39,10 @@ export type WorkspaceState = {
 export type WorkspaceAction =
   | { type: "switchMode"; mode: Mode }
   | { type: "goToStep"; step: number }
+  | { type: "markStepDone"; step: number }
+  | { type: "setKeywords"; mode: Mode; keywords: Keywords }
+  | { type: "updateNew"; update: (draft: NewDraft) => NewDraft }
+  | { type: "handoffToRewrite" }
   | { type: "openHistory" }
   | { type: "closeHistory" }
   | { type: "startProcessing"; label: string }
@@ -56,6 +63,7 @@ export const initialWorkspaceState: WorkspaceState = {
     new: initialModeState("new"),
     rewrite: initialModeState("rewrite"),
   },
+  newDraft: initialNewDraft,
   processing: null,
   historyOpen: false,
 };
@@ -81,6 +89,49 @@ function reducer(
         modes: {
           ...state.modes,
           [state.mode]: { ...current, currentStep: action.step },
+        },
+      };
+    }
+
+    case "markStepDone": {
+      const current = state.modes[state.mode];
+      const stepStatus = current.stepStatus.map((s, i) =>
+        i === action.step ? ("done" as const) : s,
+      );
+      return {
+        ...state,
+        modes: { ...state.modes, [state.mode]: { ...current, stepStatus } },
+      };
+    }
+
+    case "setKeywords": {
+      const target = state.modes[action.mode];
+      return {
+        ...state,
+        modes: {
+          ...state.modes,
+          [action.mode]: { ...target, keywords: action.keywords },
+        },
+      };
+    }
+
+    case "updateNew":
+      // AIの結果を反映するため、処理中でも更新できる（入力欄は画面側で無効化する）
+      return { ...state, newDraft: action.update(state.newDraft) };
+
+    case "handoffToRewrite": {
+      // 「このキーワードでリライト」：主・補助キーワードだけを引き継ぐ
+      if (state.processing) return state;
+      const from = state.modes.new.keywords;
+      return {
+        ...state,
+        mode: "rewrite",
+        modes: {
+          ...state.modes,
+          rewrite: {
+            ...state.modes.rewrite,
+            keywords: { main: from.main, sub: [...from.sub] },
+          },
         },
       };
     }
@@ -133,6 +184,7 @@ export function useCurrentMode() {
   const steps = STEPS[state.mode];
   return {
     mode: state.mode,
+    modeState,
     steps,
     stepIndex: modeState.currentStep,
     step: steps[modeState.currentStep],
