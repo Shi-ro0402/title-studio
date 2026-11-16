@@ -5,24 +5,25 @@
 import { useState } from "react";
 import { StepFooter } from "@/components/layout/StepFooter";
 import { StepHeading } from "@/components/layout/StepPlaceholder";
+import {
+  PlanFieldsEditor,
+  ToneSelector,
+  adoptPending,
+  discardPending,
+  editedOrigin,
+  mergeSuggestion,
+  type FieldDef,
+} from "@/components/shared/PlanFieldsEditor";
 import { AiButton, AiError, useAiRunner } from "@/components/ui/AiButton";
-import { Field, inputClass } from "@/components/ui/Field";
 import { SampleNotice } from "@/components/ui/SampleNotice";
 import { api } from "@/lib/api";
 import { LIMITS } from "@/lib/limits";
 import { isBlank } from "@/lib/text";
-import { validatePlanStep } from "@/lib/validation";
-import { TONE_LABEL, type Origin, type PlanField, type Tone } from "@/state/newDraft";
+import { hasErrors, validatePlanStep } from "@/lib/validation";
+import { TONE_LABEL, type PlanField } from "@/state/newDraft";
 import { useNewDraft } from "./useNewDraft";
 
-const FIELD_DEFS: {
-  field: PlanField;
-  label: string;
-  required: boolean;
-  max: number;
-  multiline: boolean;
-  hint?: string;
-}[] = [
+const FIELD_DEFS: FieldDef<PlanField>[] = [
   { field: "theme", label: "テーマ", required: true, max: LIMITS.theme, multiline: false },
   { field: "persona", label: "ペルソナ（想定読者）", required: true, max: LIMITS.persona, multiline: true, hint: "誰が、何に困っていて、何を知りたいのか" },
   { field: "question", label: "読者の疑問・検索目的", required: true, max: LIMITS.question, multiline: true },
@@ -30,71 +31,16 @@ const FIELD_DEFS: {
   { field: "strength", label: "記事の強み", required: false, max: LIMITS.strength, multiline: true, hint: "経験・事例など、この記事ならではの点" },
 ];
 
-export function OriginBadge({ origin }: { origin: Origin }) {
-  if (origin === "ai")
-    return <span className="rounded bg-violet-100 px-1.5 py-0.5 text-xs font-bold text-violet-800">AI推定・編集できます</span>;
-  if (origin === "edited")
-    return <span className="rounded bg-sky-100 px-1.5 py-0.5 text-xs font-bold text-sky-800">手動修正済み</span>;
-  return null;
-}
-
 export function PlanStep() {
   const { draft, keywords, locked, update, goToStep } = useNewDraft();
   const ai = useAiRunner();
   const [showErrors, setShowErrors] = useState(false);
   const errors = validatePlanStep(draft);
 
-  const editField = (field: PlanField, value: string) =>
-    update((d) => ({
-      ...d,
-      plan: { ...d.plan, [field]: value },
-      // AI推定の項目を手で直したら「手動修正済み」にする
-      planOrigin: { ...d.planOrigin, [field]: d.planOrigin[field] === "ai" ? "edited" : d.planOrigin[field] },
-    }));
-
   const suggest = async () => {
     const result = await ai.run("企画を提案中", () => api.suggestPlan({ keywords }));
-    if (!result) return;
-    update((d) => {
-      const plan = { ...d.plan };
-      const planOrigin = { ...d.planOrigin };
-      const planPending = { ...d.planPending };
-      for (const [key, value] of Object.entries(result)) {
-        const field = key as PlanField;
-        if (!value) continue;
-        // 空欄またはAI推定のままの項目は置き換える。手で入力・修正した項目は差分を確認してから採用する
-        if (isBlank(plan[field]) || planOrigin[field] === "ai") {
-          plan[field] = value;
-          planOrigin[field] = "ai";
-          delete planPending[field];
-        } else if (value !== plan[field]) {
-          planPending[field] = value;
-        }
-      }
-      return { ...d, plan, planOrigin, planPending };
-    });
+    if (result) update((d) => ({ ...d, ...mergeSuggestion(d, result) }));
   };
-
-  const adoptPending = (field: PlanField) =>
-    update((d) => {
-      const value = d.planPending[field];
-      if (value === undefined) return d;
-      const planPending = { ...d.planPending };
-      delete planPending[field];
-      return {
-        ...d,
-        plan: { ...d.plan, [field]: value },
-        planOrigin: { ...d.planOrigin, [field]: "ai" },
-        planPending,
-      };
-    });
-
-  const discardPending = (field: PlanField) =>
-    update((d) => {
-      const planPending = { ...d.planPending };
-      delete planPending[field];
-      return { ...d, planPending };
-    });
 
   const hasAiValue = Object.values(draft.planOrigin).some((o) => o !== "none");
 
@@ -111,13 +57,7 @@ export function PlanStep() {
                 選択したキーワードから、テーマ・ペルソナ・検索目的の案を作ります。手で入力した項目は、採用するか選べます。
               </p>
             </div>
-            <AiButton
-              label="企画を提案する"
-              busyLabel="提案中…"
-              running={ai.running}
-              disabled={!keywords.main}
-              onClick={suggest}
-            />
+            <AiButton label="企画を提案する" busyLabel="提案中…" running={ai.running} disabled={!keywords.main} onClick={suggest} />
           </div>
           {!keywords.main && (
             <p className="text-sm text-slate-700">
@@ -132,94 +72,26 @@ export function PlanStep() {
         </div>
 
         <div className="flex flex-col gap-5">
-          {FIELD_DEFS.map((def) => {
-            const value = draft.plan[def.field];
-            const pending = draft.planPending[def.field];
-            const error = showErrors ? errors[def.field] : value && errors[def.field]?.includes("超過") ? errors[def.field] : undefined;
-            const id = `plan-${def.field}`;
-            return (
-              <div key={def.field} className="flex flex-col gap-2">
-                <Field
-                  id={id}
-                  label={def.label}
-                  required={def.required}
-                  max={def.max}
-                  value={value}
-                  error={error}
-                  hint={def.hint}
-                  badge={<OriginBadge origin={draft.planOrigin[def.field]} />}
-                >
-                  {def.multiline ? (
-                    <textarea
-                      id={id}
-                      rows={3}
-                      className={inputClass}
-                      value={value}
-                      disabled={locked}
-                      aria-invalid={error ? true : undefined}
-                      onChange={(e) => editField(def.field, e.target.value)}
-                    />
-                  ) : (
-                    <input
-                      id={id}
-                      className={inputClass}
-                      value={value}
-                      disabled={locked}
-                      aria-invalid={error ? true : undefined}
-                      onChange={(e) => editField(def.field, e.target.value)}
-                    />
-                  )}
-                </Field>
-                {pending !== undefined && (
-                  <div className="rounded-md border border-violet-200 bg-violet-50 p-3 text-sm">
-                    <p className="font-bold text-violet-900">AIの提案（未採用）</p>
-                    <p className="mt-1 whitespace-pre-wrap text-slate-800">{pending}</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => adoptPending(def.field)}
-                        disabled={locked}
-                        className="rounded-md bg-violet-700 px-3 py-1 text-xs font-bold text-white disabled:opacity-50"
-                      >
-                        提案を採用する
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => discardPending(def.field)}
-                        disabled={locked}
-                        className="rounded-md border border-slate-300 bg-white px-3 py-1 text-xs text-slate-700 disabled:opacity-50"
-                      >
-                        今の内容を残す
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-800">
-              トーン
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-600">初期値あり</span>
-            </legend>
-            <div className="flex flex-wrap gap-3">
-              {(Object.keys(TONE_LABEL) as Tone[]).map((tone) => (
-                <label key={tone} className="flex items-center gap-1.5 text-sm text-slate-800">
-                  <input
-                    type="radio"
-                    name="tone"
-                    value={tone}
-                    checked={draft.tone === tone}
-                    disabled={locked}
-                    onChange={() => update((d) => ({ ...d, tone }))}
-                  />
-                  {TONE_LABEL[tone]}
-                  {tone === "easy" && <span className="text-xs text-slate-500">（初期値）</span>}
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          <PlanFieldsEditor
+            idPrefix="plan"
+            defs={FIELD_DEFS}
+            values={draft.plan}
+            origins={draft.planOrigin}
+            pending={draft.planPending}
+            errors={errors}
+            showErrors={showErrors}
+            locked={locked}
+            onEdit={(field, value) =>
+              update((d) => ({
+                ...d,
+                plan: { ...d.plan, [field]: value },
+                planOrigin: { ...d.planOrigin, [field]: editedOrigin(d.planOrigin[field]) },
+              }))
+            }
+            onAdopt={(field) => update((d) => ({ ...d, ...adoptPending(d, field) }))}
+            onDiscard={(field) => update((d) => ({ ...d, planPending: discardPending(d.planPending, field) }))}
+          />
+          <ToneSelector name="new-tone" value={draft.tone} locked={locked} onChange={(tone) => update((d) => ({ ...d, tone }))} />
         </div>
 
         {/* 記事の制作方針（一覧で確認） */}
@@ -242,9 +114,7 @@ export function PlanStep() {
             <dd className="text-slate-900">{TONE_LABEL[draft.tone]}</dd>
           </dl>
           {isBlank(draft.plan.summary) && (
-            <p className="text-xs text-slate-600">
-              構成・内容要約が未入力のため、「企画段階のタイトル候補」として進みます。
-            </p>
+            <p className="text-xs text-slate-600">構成・内容要約が未入力のため、「企画段階のタイトル候補」として進みます。</p>
           )}
         </div>
       </section>
@@ -252,7 +122,7 @@ export function PlanStep() {
       <StepFooter
         onBeforeNext={() => {
           setShowErrors(true);
-          return Object.keys(validatePlanStep(draft)).length === 0;
+          return !hasErrors(validatePlanStep(draft));
         }}
       />
     </>

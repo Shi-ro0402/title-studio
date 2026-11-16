@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { StepFooter } from "@/components/layout/StepFooter";
 import { StepHeading } from "@/components/layout/StepPlaceholder";
+import { RefList } from "@/components/shared/TopRefsEditor";
 import { AiButton, AiError, useAiRunner } from "@/components/ui/AiButton";
 import { SampleNotice } from "@/components/ui/SampleNotice";
 import { copyText, useToast } from "@/components/ui/Toast";
@@ -148,18 +149,8 @@ export function TitleStep() {
                   ))}
                 </ol>
               </>
-            ) : draft.topRefs.length === 0 ? (
-              <p className="rounded-md bg-slate-50 px-3 py-4 text-sm text-slate-600">参考上位は登録されていません（参考比較を省略）。</p>
             ) : (
-              <ul className="flex flex-col gap-1 rounded-md bg-slate-50 p-3 text-sm">
-                <li className="text-xs text-slate-500">利用者が登録した検索上位</li>
-                {draft.topRefs.map((r) => (
-                  <li key={r.id}>
-                    <span className="mr-2 text-slate-500">{r.rank}位</span>
-                    {r.title}
-                  </li>
-                ))}
-              </ul>
+              <RefList refs={draft.topRefs} />
             )}
 
             <div>

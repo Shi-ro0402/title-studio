@@ -10,7 +10,7 @@ type StepFooterProps = {
    * 任意項目の未入力では止めない。
    */
   onBeforeNext?: () => boolean;
-  /** 戻る／次へ以外の副次操作（例：このキーワードでリライト） */
+  /** 戻る／次へ以外の副次操作を置く場所 */
   extra?: ReactNode;
 };
 

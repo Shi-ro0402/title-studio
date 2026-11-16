@@ -14,9 +14,7 @@ export function KeywordSummary() {
       </div>
       <div className="flex gap-2">
         <dt className="font-bold text-slate-600">補助キーワード</dt>
-        <dd className="text-slate-900">
-          {keywords.sub.length > 0 ? keywords.sub.join("、") : "なし"}
-        </dd>
+        <dd className="text-slate-900">{keywords.sub.length > 0 ? keywords.sub.join("、") : "なし"}</dd>
       </div>
     </dl>
   );

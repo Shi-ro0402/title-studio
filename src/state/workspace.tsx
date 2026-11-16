@@ -12,6 +12,7 @@ import {
 } from "react";
 import { STEPS, type Mode, type StepStatus } from "@/lib/steps";
 import { initialNewDraft, type NewDraft } from "./newDraft";
+import { initialRewriteDraft, type RewriteDraft } from "./rewriteDraft";
 
 export type Keywords = {
   main: string | null;
@@ -31,6 +32,8 @@ export type WorkspaceState = {
   modes: Record<Mode, ModeState>;
   /** 新規作成の作業データ */
   newDraft: NewDraft;
+  /** タイトルリライトの作業データ */
+  rewriteDraft: RewriteDraft;
   /** AI処理・URL取得中の段階名。null なら処理していない */
   processing: string | null;
   historyOpen: boolean;
@@ -42,7 +45,7 @@ export type WorkspaceAction =
   | { type: "markStepDone"; step: number }
   | { type: "setKeywords"; mode: Mode; keywords: Keywords }
   | { type: "updateNew"; update: (draft: NewDraft) => NewDraft }
-  | { type: "handoffToRewrite" }
+  | { type: "updateRewrite"; update: (draft: RewriteDraft) => RewriteDraft }
   | { type: "openHistory" }
   | { type: "closeHistory" }
   | { type: "startProcessing"; label: string }
@@ -64,6 +67,7 @@ export const initialWorkspaceState: WorkspaceState = {
     rewrite: initialModeState("rewrite"),
   },
   newDraft: initialNewDraft,
+  rewriteDraft: initialRewriteDraft,
   processing: null,
   historyOpen: false,
 };
@@ -119,22 +123,8 @@ function reducer(
       // AIの結果を反映するため、処理中でも更新できる（入力欄は画面側で無効化する）
       return { ...state, newDraft: action.update(state.newDraft) };
 
-    case "handoffToRewrite": {
-      // 「このキーワードでリライト」：主・補助キーワードだけを引き継ぐ
-      if (state.processing) return state;
-      const from = state.modes.new.keywords;
-      return {
-        ...state,
-        mode: "rewrite",
-        modes: {
-          ...state.modes,
-          rewrite: {
-            ...state.modes.rewrite,
-            keywords: { main: from.main, sub: [...from.sub] },
-          },
-        },
-      };
-    }
+    case "updateRewrite":
+      return { ...state, rewriteDraft: action.update(state.rewriteDraft) };
 
     case "openHistory":
       if (state.processing) return state;

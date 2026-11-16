@@ -1,8 +1,8 @@
 // 開発用のサンプルAPI。AIは使わず、少し待ってから固定のサンプルを返す。
-// 画面と操作を先に作るためのもので、段階6で Claude API に差し替える。
+// 画面と操作を先に作るためのもので、段階5（URL読み込み）・段階6（Claude API）で差し替える。
 
 import type { TitleApi } from "@/lib/api";
-import { SAMPLE_TITLES } from "./sampleData";
+import { SAMPLE_ARTICLE, SAMPLE_IMPROVED_TITLES, SAMPLE_TITLES } from "./sampleData";
 
 const WAIT_MS = 1200;
 
@@ -15,6 +15,16 @@ const INTENTS = [
   "比較・検討（選び方や違いを知りたい）",
   "行動（始め方・手順を知りたい）",
 ];
+
+function sampleTrend(refs: { id: string }[]) {
+  // 根拠が少ないときは無理にカテゴリを増やさない（最大3個、件数以下）
+  const names = ["基礎知識", "始め方・手順", "注意点"];
+  const count = Math.min(names.length, refs.length);
+  return names.slice(0, count).map((name, i) => ({
+    name,
+    refIds: refs.filter((_, j) => j % count === i).map((r) => r.id),
+  }));
+}
 
 export const mockApi: TitleApi = {
   async analyzeKeywords({ keywords }) {
@@ -41,17 +51,45 @@ export const mockApi: TitleApi = {
 
   async analyzeTop({ refs }) {
     await wait();
-    // 根拠が少ないときは無理にカテゴリを増やさない（最大3個、件数以下）
-    const names = ["基礎知識", "始め方・手順", "注意点"];
-    const count = Math.min(names.length, refs.length);
-    return names.slice(0, count).map((name, i) => ({
-      name,
-      refIds: refs.filter((_, j) => j % count === i).map((r) => r.id),
-    }));
+    return sampleTrend(refs);
   },
 
   async generateTitles() {
     await wait();
     return SAMPLE_TITLES.map((t) => ({ ...t }));
+  },
+
+  async fetchArticle() {
+    await wait();
+    return { ...SAMPLE_ARTICLE, headings: [...SAMPLE_ARTICLE.headings] };
+  },
+
+  async analyzeArticle() {
+    await wait();
+    return {
+      plan: {
+        theme: "未経験からWebライターを始めるための準備と最初の行動",
+        persona: "副業でWebライターを始めたい会社員。文章を書くのは好きだが実績がなく、何から準備すればよいかわからない。",
+        question: "未経験でもWebライターになれるのか、最初に何をすればよいのか。",
+        summary: "Webライターの仕事内容、始める前の準備（学習・ポートフォリオ）、案件の探し方と応募時の注意点を順に説明している。",
+        strength: "",
+      },
+      keywordCandidates: ["webライター 未経験", "webライター 始め方", "webライター 案件"],
+    };
+  },
+
+  async compareTop({ refs }) {
+    await wait();
+    return {
+      trend: sampleTrend(refs),
+      common: ["「未経験」「始め方」を前半に置き、初心者向けであることを示している"],
+      differences: ["上位は手順の網羅を打ち出すものが多く、現在のタイトルは準備の話に寄っている"],
+      answerable: ["始める前の準備", "案件の探し方", "応募時の注意点"],
+    };
+  },
+
+  async generateRewriteTitles() {
+    await wait();
+    return SAMPLE_IMPROVED_TITLES.map((t) => ({ ...t }));
   },
 };

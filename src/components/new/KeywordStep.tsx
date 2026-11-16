@@ -5,30 +5,24 @@
 import { useState } from "react";
 import { StepFooter } from "@/components/layout/StepFooter";
 import { StepHeading } from "@/components/layout/StepPlaceholder";
+import { SubKeywordEditor } from "@/components/shared/SubKeywordEditor";
+import { useKeywordOps } from "@/components/shared/useKeywordOps";
 import { AiButton, AiError, useAiRunner } from "@/components/ui/AiButton";
-import { Field, RequiredBadge, inputClass } from "@/components/ui/Field";
+import { RequiredBadge, inputClass } from "@/components/ui/Field";
 import { SampleNotice } from "@/components/ui/SampleNotice";
 import { api } from "@/lib/api";
+import { RESEARCH_SITES } from "@/lib/externalLinks";
 import { LIMITS } from "@/lib/limits";
 import { countChars, isBlank } from "@/lib/text";
 import { validateKeywordStep } from "@/lib/validation";
 import { SOURCE_LABEL, newId, todayString, type Candidate } from "@/state/newDraft";
-import { useWorkspace, useWorkspaceDispatch } from "@/state/workspace";
 import { useNewDraft } from "./useNewDraft";
 
-const RESEARCH_SITES = [
-  { name: "aramakijake.jp", url: "https://aramakijake.jp/" },
-  { name: "Ubersuggest", url: "https://neilpatel.com/jp/ubersuggest/" },
-];
-
 export function KeywordStep() {
-  const { draft, keywords, locked, update, setKeywords } = useNewDraft();
-  const workspace = useWorkspace();
-  const dispatch = useWorkspaceDispatch();
+  const { draft, locked, update } = useNewDraft();
+  const { keywords, setMain, clearMain, addSub } = useKeywordOps("new");
   const ai = useAiRunner();
   const [showErrors, setShowErrors] = useState(false);
-  const [subInput, setSubInput] = useState("");
-  const [subError, setSubError] = useState<string | null>(null);
 
   const errors = validateKeywordStep(draft, keywords);
   const visibleError = (key: string) => (showErrors ? errors[key] : undefined);
@@ -53,57 +47,11 @@ export function KeywordStep() {
   const removeCandidate = (id: string) =>
     update((d) => ({ ...d, candidates: d.candidates.filter((c) => c.id !== id) }));
 
-  // ---- 主・補助キーワードの選択 ----
-  const setMain = (word: string) => {
-    const value = word.trim();
-    if (!value || value === keywords.main) return;
-    if (countChars(value) > LIMITS.keyword) return;
-    const inSub = keywords.sub.includes(value);
-    const messages: string[] = [];
-    if (keywords.main) {
-      messages.push(
-        `主キーワードを「${keywords.main}」から「${value}」に変更します。`,
-        "以前の主キーワードは補助キーワードに移りません。",
-      );
-    }
-    if (inSub) messages.push(`「${value}」は補助キーワードから外れます。`);
-    if (messages.length > 0 && !window.confirm(`${messages.join("\n")}\nよろしいですか？`)) return;
-    setKeywords({ main: value, sub: keywords.sub.filter((s) => s !== value) });
-  };
-
-  const addSub = (word: string): string | null => {
-    const value = word.trim();
-    if (!value) return "補助キーワードを入力してください。";
-    if (countChars(value) > LIMITS.keyword) return `${LIMITS.keyword}文字以内で入力してください。`;
-    if (value === keywords.main) return "主キーワードと同じ語は、補助キーワードに登録できません。";
-    if (keywords.sub.includes(value)) return "すでに補助キーワードに追加されています。";
-    if (keywords.sub.length >= LIMITS.subKeywords)
-      return `補助キーワードは最大${LIMITS.subKeywords}個までです。`;
-    setKeywords({ ...keywords, sub: [...keywords.sub, value] });
-    return null;
-  };
-
-  const removeSub = (word: string) =>
-    setKeywords({ ...keywords, sub: keywords.sub.filter((s) => s !== word) });
-
   // ---- AI分析 ----
   const analyze = async () => {
     const words = filledCandidates.map((c) => c.keyword.trim());
     const result = await ai.run("候補を分析中", () => api.analyzeKeywords({ keywords: words }));
     if (result) update((d) => ({ ...d, keywordInsights: result }));
-  };
-
-  const handoff = () => {
-    const target = workspace.modes.rewrite.keywords;
-    const hasValue = target.main !== null || target.sub.length > 0;
-    if (
-      hasValue &&
-      !window.confirm(
-        "リライト側にはすでにキーワードが設定されています。新規作成の主・補助キーワードで置き換えますか？",
-      )
-    )
-      return;
-    dispatch({ type: "handoffToRewrite" });
   };
 
   return (
@@ -175,7 +123,10 @@ export function KeywordStep() {
                     volumeError={errors[`candidate.${c.id}.volume`]}
                     onChange={(patch) => editCandidate(c.id, patch)}
                     onRemove={() => removeCandidate(c.id)}
-                    onSetMain={() => setMain(c.keyword)}
+                    onSetMain={() => {
+                      const message = setMain(c.keyword);
+                      if (message) window.alert(message);
+                    }}
                     onAddSub={() => {
                       const message = addSub(c.keyword);
                       if (message) window.alert(message);
@@ -252,7 +203,7 @@ export function KeywordStep() {
                 <span className="text-sm font-bold text-slate-900">{keywords.main}</span>
                 <button
                   type="button"
-                  onClick={() => setKeywords({ ...keywords, main: null })}
+                  onClick={clearMain}
                   disabled={locked}
                   className="text-xs text-slate-600 underline disabled:opacity-50"
                 >
@@ -265,73 +216,7 @@ export function KeywordStep() {
             {visibleError("main") && <p className="text-sm text-red-700">{errors.main}</p>}
           </div>
 
-          <div className="flex flex-col gap-2 rounded-md border border-slate-200 p-4">
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-slate-900">補助キーワード</h2>
-              <RequiredBadge required={false} />
-              <span className="text-xs text-slate-500">
-                {keywords.sub.length}／最大{LIMITS.subKeywords}個
-              </span>
-            </div>
-            {keywords.sub.length > 0 ? (
-              <ul className="flex flex-wrap gap-2">
-                {keywords.sub.map((s) => (
-                  <li key={s} className="flex items-center gap-1 rounded-full bg-slate-100 py-1 pl-3 pr-1 text-sm">
-                    {s}
-                    <button
-                      type="button"
-                      onClick={() => removeSub(s)}
-                      disabled={locked}
-                      aria-label={`${s} を補助キーワードから外す`}
-                      className="rounded-full px-2 text-slate-500 hover:bg-slate-200 disabled:opacity-50"
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-slate-500">なし（未入力でも進めます）</p>
-            )}
-            <Field
-              id="sub-input"
-              label="補助キーワードを手入力"
-              required={false}
-              max={LIMITS.keyword}
-              value={subInput}
-              error={subError}
-            >
-              <div className="flex gap-2">
-                <input
-                  id="sub-input"
-                  className={inputClass}
-                  value={subInput}
-                  disabled={locked || keywords.sub.length >= LIMITS.subKeywords}
-                  onChange={(e) => setSubInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                      e.preventDefault();
-                      const message = addSub(subInput);
-                      setSubError(message);
-                      if (!message) setSubInput("");
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  disabled={locked || keywords.sub.length >= LIMITS.subKeywords}
-                  onClick={() => {
-                    const message = addSub(subInput);
-                    setSubError(message);
-                    if (!message) setSubInput("");
-                  }}
-                  className="shrink-0 rounded-md border border-slate-300 bg-white px-3 text-sm hover:bg-slate-50 disabled:opacity-50"
-                >
-                  追加
-                </button>
-              </div>
-            </Field>
-          </div>
+          <SubKeywordEditor mode="new" />
         </div>
       </section>
 
@@ -340,16 +225,6 @@ export function KeywordStep() {
           setShowErrors(true);
           return Object.keys(validateKeywordStep(draft, keywords)).length === 0;
         }}
-        extra={
-          <button
-            type="button"
-            onClick={handoff}
-            disabled={locked || !keywords.main}
-            className="w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-          >
-            このキーワードでリライト
-          </button>
-        }
       />
     </>
   );

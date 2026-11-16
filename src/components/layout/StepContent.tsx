@@ -4,6 +4,11 @@ import { KeywordStep } from "@/components/new/KeywordStep";
 import { PlanStep } from "@/components/new/PlanStep";
 import { TitleStep } from "@/components/new/TitleStep";
 import { TopStep } from "@/components/new/TopStep";
+import { CompareStep } from "@/components/rewrite/CompareStep";
+import { ConditionStep } from "@/components/rewrite/ConditionStep";
+import { ImproveStep } from "@/components/rewrite/ImproveStep";
+import { KeywordRankStep } from "@/components/rewrite/KeywordRankStep";
+import { LoadStep } from "@/components/rewrite/LoadStep";
 import { useCurrentMode } from "@/state/workspace";
 import { StepPlaceholder } from "./StepPlaceholder";
 
@@ -22,7 +27,19 @@ export function StepContent() {
       case "titles":
         return <TitleStep />;
     }
+  } else {
+    switch (step.id) {
+      case "load":
+        return <LoadStep />;
+      case "keyword":
+        return <KeywordRankStep />;
+      case "condition":
+        return <ConditionStep />;
+      case "compare":
+        return <CompareStep />;
+      case "improve":
+        return <ImproveStep />;
+    }
   }
-  // リライトは段階3で作成する
   return <StepPlaceholder />;
 }
