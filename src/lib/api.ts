@@ -12,6 +12,7 @@ import type {
 } from "@/state/newDraft";
 import type { Comparison, ImprovedTitle, RewriteDraft, RewritePlanField } from "@/state/rewriteDraft";
 import { mockApi } from "@/mocks/mockApi";
+import { aiClient } from "./aiClient";
 import { fetchArticle } from "./fetchArticleClient";
 
 export type PlanSuggestion = Partial<Record<PlanField, string>>;
@@ -84,8 +85,11 @@ export type TitleApi = {
   generateRewriteTitles(input: RewriteTitlesInput): Promise<GenerateOutcome<ImprovedTitle>>;
 };
 
-/** AI処理がサンプルかどうか（画面に「サンプル」と表示するため）。段階6で false にする */
-export const USING_SAMPLE_API = true;
+/**
+ * AI処理をサンプルにするか。開発中に料金をかけずに画面を確かめたいときは、
+ * .env.local に NEXT_PUBLIC_USE_MOCK_AI=1 を書いて開発用サーバーを再起動する。
+ */
+export const USING_SAMPLE_API = process.env.NEXT_PUBLIC_USE_MOCK_AI === "1";
 
-// 記事URLの読み込みは本物（段階5）。AI処理はまだサンプル。
-export const api: TitleApi = { ...mockApi, fetchArticle };
+// 記事URLの読み込みは常に本物。AI処理は Claude API（サンプル設定のときだけサンプル）。
+export const api: TitleApi = USING_SAMPLE_API ? { ...mockApi, fetchArticle } : { ...aiClient, fetchArticle };
