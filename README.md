@@ -164,3 +164,8 @@ src/
 - 作業中に合言葉の期限が切れたら、ページを移動せずに再入力画面を出す（入力内容は残る）。
 - 記録の保存先：開発中はサーバーのメモリ。Vercel では外部の保存先（Upstash Redis）が必要で、つなぐまではAI処理を止める。
 - 設定：`.env.local` に `ACCESS_PASSPHRASE` と `SESSION_SECRET`（32文字以上）。書き方は `.env.example`。
+
+### 2026-11-17　公開の準備（コード側）
+
+- 回数の記録先に Upstash Redis を追加（`@upstash/redis`、版を固定）。接続情報（`KV_REST_API_URL`／`KV_REST_API_TOKEN`、または `UPSTASH_REDIS_REST_URL`／`UPSTASH_REDIS_REST_TOKEN`）があれば Upstash に記録し、なければ開発中はメモリに記録する。Vercel 上で接続情報がなければ、これまでどおり処理を止める。
+- Vercel での処理時間の上限を明示（AI処理 90秒、記事読み込み 30秒）。

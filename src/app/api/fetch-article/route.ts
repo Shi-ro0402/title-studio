@@ -9,6 +9,9 @@ import { FetchError } from "@/lib/server/urlGuard";
 
 const MAX_URL_LENGTH = 2048;
 
+// 公開先（Vercel）で、この処理に使ってよい最大の秒数（取得15秒＋本文の取り出しの余裕）
+export const maxDuration = 30;
+
 export async function POST(request: Request) {
   // 合言葉を通過したブラウザだけが使える（利用回数は使わない）
   const session = await requireSession(request);

@@ -11,6 +11,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "1.8.0",
     "@mozilla/readability": "0.6.0",
+    "@upstash/redis": "1.41.0",
     "linkedom": "0.18.15",
     "next": "16.4.6",
     "react": "19.3.0",

@@ -28,6 +28,10 @@ const ACTIONS: Record<string, (input: unknown) => Promise<unknown>> = {
   "generate-rewrite-titles": generateRewriteTitles,
 };
 
+// 公開先（Vercel）で、この処理に使ってよい最大の秒数。
+// AI処理は1操作60秒で打ち切るので、前後の処理の余裕を見て90秒にしておく
+export const maxDuration = 90;
+
 // 入力の上限（本文5,000文字＋その他の項目に十分な大きさ）
 const MAX_BODY_BYTES = 100_000;
 
