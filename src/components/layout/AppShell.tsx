@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ReauthDialog } from "@/components/auth/ReauthDialog";
 import { ToastProvider } from "@/components/ui/Toast";
 import { useUsage } from "@/lib/usage";
 import { MODE_LABEL } from "@/lib/steps";
 import { WorkspaceProvider, hasWorkInProgress, useWorkspace, useWorkspaceDispatch } from "@/state/workspace";
+import { DataPolicyDialog } from "./DataPolicyDialog";
 import { Header } from "./Header";
 import { HistoryPanel } from "./HistoryPanel";
 import { KeywordSummary } from "./KeywordSummary";
@@ -30,6 +31,7 @@ function Workspace() {
   const { mode, processing } = state;
   const theme = MODE_THEME[mode];
   const dirty = hasWorkInProgress(state);
+  const [policyOpen, setPolicyOpen] = useState(false);
 
   // 途中入力があるときだけ、再読み込み・ページ離脱でブラウザ標準の確認を出す。
   // 工程・モードの切り替えはページ内の移動なので確認しない。
@@ -73,18 +75,28 @@ function Workspace() {
           <p className="text-xs text-slate-600">
             作業途中の内容は保存しません。生成成功時の履歴のみ保存します。
           </p>
-          <button
-            type="button"
-            onClick={clear}
-            disabled={processing !== null}
-            className="rounded-md px-2 py-1 text-xs text-slate-600 underline hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {MODE_LABEL[mode]}の入力をクリア
-          </button>
+          <div className="flex flex-wrap items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setPolicyOpen(true)}
+              className="rounded-md px-2 py-1 text-xs text-slate-600 underline hover:text-slate-900"
+            >
+              データの扱いについて
+            </button>
+            <button
+              type="button"
+              onClick={clear}
+              disabled={processing !== null}
+              className="rounded-md px-2 py-1 text-xs text-slate-600 underline hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {MODE_LABEL[mode]}の入力をクリア
+            </button>
+          </div>
         </div>
       </main>
       <HistoryPanel />
       <ReauthDialog />
+      {policyOpen && <DataPolicyDialog onClose={() => setPolicyOpen(false)} />}
     </div>
   );
 }

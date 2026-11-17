@@ -124,6 +124,11 @@ export function LoadStep() {
             className="w-fit text-sm text-teal-800 underline disabled:opacity-50">
             読み込めない場合は本文を貼り付ける
           </button>
+          {/* 将来機能：保存した記事を選んで読み込む（初版は準備中の導線だけ） */}
+          <button type="button" disabled
+            className="w-fit cursor-not-allowed rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-sm text-slate-400">
+            保存記事から選ぶ（準備中）
+          </button>
         </div>
 
         {/* 取得・貼り付けた内容の確認と編集 */}
