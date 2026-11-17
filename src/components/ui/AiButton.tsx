@@ -4,6 +4,8 @@
 
 import { useState } from "react";
 import { MODE_THEME } from "@/components/layout/modeTheme";
+import { USING_SAMPLE_API } from "@/lib/api";
+import { useUsage } from "@/lib/usage";
 import { UserFacingError } from "@/lib/userError";
 import { useCurrentMode, useWorkspace, useWorkspaceDispatch } from "@/state/workspace";
 
@@ -17,13 +19,17 @@ type AiButtonProps = {
 
 export function AiButton({ label, busyLabel, running, disabled, onClick }: AiButtonProps) {
   const { mode, locked } = useCurrentMode();
+  const { usage } = useUsage();
   const theme = MODE_THEME[mode];
+  // サンプル設定では回数を使わない。それ以外は、上限に達していれば押せない
+  const limitReached = !USING_SAMPLE_API && usage !== null && usage.remaining === 0;
 
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled || locked}
+      disabled={disabled || locked || limitReached}
+      title={limitReached ? "利用上限に達しています。再開までお待ちください" : undefined}
       className={`inline-flex flex-col items-center rounded-md px-5 py-2 font-bold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${theme.primaryButton}`}
     >
       <span className="text-sm">{running ? busyLabel : label}</span>

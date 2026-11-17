@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+import { ReauthDialog } from "@/components/auth/ReauthDialog";
 import { ToastProvider } from "@/components/ui/Toast";
+import { useUsage } from "@/lib/usage";
 import { MODE_LABEL } from "@/lib/steps";
 import { WorkspaceProvider, hasWorkInProgress, useWorkspace, useWorkspaceDispatch } from "@/state/workspace";
 import { Header } from "./Header";
@@ -62,6 +64,7 @@ function Workspace() {
             {processing}…　AI処理中は画面の切り替え・入力変更ができません。
           </p>
         )}
+        <UsageLimitNotice />
         <KeywordSummary />
         <div className="flex flex-col gap-6 rounded-lg bg-white p-4 shadow-sm sm:p-6">
           <StepContent />
@@ -81,6 +84,18 @@ function Workspace() {
         </div>
       </main>
       <HistoryPanel />
+      <ReauthDialog />
     </div>
+  );
+}
+
+/** 利用上限に達しているときの案内。閲覧・コピー・工程移動は続けられる */
+function UsageLimitNotice() {
+  const { usage } = useUsage();
+  if (!usage || usage.remaining > 0) return null;
+  return (
+    <p role="status" className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
+      直近{usage.windowMinutes}分間の利用上限（{usage.limit}回）に達しました。あと約{Math.ceil(usage.retryAfterSec / 60)}分で再開できます。閲覧・コピー・工程の移動は続けられます。
+    </p>
   );
 }

@@ -1,6 +1,8 @@
 // 画面からサーバーの API を呼ぶ共通処理。
 // 失敗したときは、理由がわかる UserFacingError にして投げる。
+// 応答に残り回数が含まれていれば表示を更新し、合言葉の確認が必要なら再入力画面を開く。
 
+import { requestReauth, setUsage, type Usage } from "./usage";
 import { UserFacingError } from "./userError";
 
 export async function postJson<T>(path: string, body: unknown, timeoutMs: number): Promise<T> {
@@ -14,7 +16,10 @@ export async function postJson<T>(path: string, body: unknown, timeoutMs: number
       signal: controller.signal,
     });
     const data = await res.json().catch(() => null);
+    const usage: Usage | undefined = data?.usage ?? data?.error?.usage;
+    if (usage) setUsage(usage);
     if (!data || !data.ok) {
+      if (data?.error?.code === "unauthorized") requestReauth();
       throw new UserFacingError(
         data?.error?.message ?? "処理に失敗しました。時間をおいて再試行してください。",
         data?.error?.code,

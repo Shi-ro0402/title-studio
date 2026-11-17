@@ -3,12 +3,17 @@
 // 公開元のWebサイトは変更しない（読み取りだけ）。
 
 import { extractArticle } from "@/lib/server/extractArticle";
+import { requireSession } from "@/lib/server/guard";
 import { fetchPublicHtml } from "@/lib/server/safeFetch";
 import { FetchError } from "@/lib/server/urlGuard";
 
 const MAX_URL_LENGTH = 2048;
 
 export async function POST(request: Request) {
+  // 合言葉を通過したブラウザだけが使える（利用回数は使わない）
+  const session = await requireSession(request);
+  if (session instanceof Response) return session;
+
   let url: unknown;
   try {
     ({ url } = await request.json());
