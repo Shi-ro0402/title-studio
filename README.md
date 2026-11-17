@@ -169,3 +169,4 @@ src/
 
 - 回数の記録先に Upstash Redis を追加（`@upstash/redis`、版を固定）。接続情報（`KV_REST_API_URL`／`KV_REST_API_TOKEN`、または `UPSTASH_REDIS_REST_URL`／`UPSTASH_REDIS_REST_TOKEN`）があれば Upstash に記録し、なければ開発中はメモリに記録する。Vercel 上で接続情報がなければ、これまでどおり処理を止める。
 - Vercel での処理時間の上限を明示（AI処理 90秒、記事読み込み 30秒）。
+- GitHub に公開リポジトリとして送った（https://github.com/Shi-ro0402/title-studio 、`main` ブランチ）。秘密の情報（APIキー・合言葉・署名用の鍵）は含まれていないことを確認済み。
