@@ -68,7 +68,7 @@ src/
 | 5 | URL読み込み | 完了 |
 | 6 | Claude API 接続 | 完了 |
 | 7 | 履歴保存（LocalStorage） | 完了 |
-| 8 | 合言葉と利用制限 | 完了（公開時に Upstash Redis を接続） |
+| 8 | 合言葉と利用制限 | 完了 |
 | 9 | 検収 | 未着手 |
 
 ## 開発の記録
@@ -170,3 +170,10 @@ src/
 - 回数の記録先に Upstash Redis を追加（`@upstash/redis`、版を固定）。接続情報（`KV_REST_API_URL`／`KV_REST_API_TOKEN`、または `UPSTASH_REDIS_REST_URL`／`UPSTASH_REDIS_REST_TOKEN`）があれば Upstash に記録し、なければ開発中はメモリに記録する。Vercel 上で接続情報がなければ、これまでどおり処理を止める。
 - Vercel での処理時間の上限を明示（AI処理 90秒、記事読み込み 30秒）。
 - GitHub に公開リポジトリとして送った（https://github.com/Shi-ro0402/title-studio 、`main` ブランチ）。秘密の情報（APIキー・合言葉・署名用の鍵）は含まれていないことを確認済み。
+
+### 2026-11-18　Vercel で公開
+
+- GitHub の `main` を Vercel に取り込んで公開した。Vercel（Hobby）と Upstash Redis（Free・Tokyo）をつないだ。
+- Vercel に登録する環境変数：`ANTHROPIC_API_KEY`（公開用に別のキー）、`ACCESS_PASSPHRASE`、`SESSION_SECRET`（公開用に作り直し）。Upstash を接続すると `KV_REST_API_URL`・`KV_REST_API_TOKEN` などが自動で追加される。**すべて Production（本番）にも入れる**こと。
+- つまずき：最初は Upstash が未接続で、3つの環境変数も Production に入っていなかったため、合言葉の画面で「保存先が設定されていない」と表示された。Production にチェックを入れ、Upstash を接続し、本番をデプロイし直して解決した。
+- 注意：`main` に送る（push）と、Vercel が自動で本番を作り直す。
